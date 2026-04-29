@@ -6,6 +6,10 @@ from rag_pipeline import generate_answer
 
 import streamlit as st
 
+@st.cache_resource
+def get_vector_store(_chunks):
+    return create_vector_store(_chunks)
+
 st.set_page_config(
     page_title="RAG Document Assistant",
     layout="wide"
@@ -19,12 +23,25 @@ uploaded_file = st.file_uploader(
     type=["pdf"]
 )
 
+st.sidebar.header("Settings")
+
+chunk_size = st.sidebar.slider("Chunk Size", 500, 2000, 1000, 100)
+chunk_overlap = st.sidebar.slider("Chunk Overlap", 0, 500, 200, 50)
+top_k = st.sidebar.slider("Retrived Chunks", 1, 8, 4)
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
 if uploaded_file is not None:
     st.success(f"Uploaded: {uploaded_file.name}")
 
     pages = extract_text_from_pdf(uploaded_file)
     full_text = combine_pages(pages)
-    chunks = chunk_document(pages)
+    chunks = chunk_document(
+        pages,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap
+    )
 
     st.subheader("Document Info")
     st.write(f"**Pages:** {len(pages)}")
@@ -68,8 +85,8 @@ if uploaded_file is not None:
 
     if question:
         with st.spinner("Searching relevant chunks..."):
-            vector_store = create_vector_store(chunks)
-            results = search_similar_chunks(vector_store, question)
+            vector_store = get_vector_store(chunks)
+            results = search_similar_chunks(vector_store, question, k=top_k)
 
         retrieved_docs = [doc for doc, score in results]
 
@@ -79,9 +96,20 @@ if uploaded_file is not None:
         st.write("### Answer")
         st.write(answer)
 
+        st.session_state.messages.append({
+            "question": question,
+            "answer": answer
+        })
+
         st.write("### Sources")
 
         for i, (doc, score) in enumerate(results, start=1):
             with st.expander(f"Source {i} — Page {doc.metadata.get('page_number')}"):
                 st.write(f"Similarity score: {score:.4f}")
                 st.write(doc.page_content)
+
+    st.subheader("Chat History")
+
+    for message in reversed(st.session_state.messages):
+        with st.expander(message["question"]):
+            st.write(message["answer"])
