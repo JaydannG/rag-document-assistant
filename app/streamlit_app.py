@@ -2,6 +2,8 @@ from document_loader import extract_text_from_pdf, combine_pages, chunk_document
 
 from vector_store import create_vector_store, search_similar_chunks
 
+from rag_pipeline import generate_answer
+
 import streamlit as st
 
 st.set_page_config(
@@ -60,23 +62,26 @@ if uploaded_file is not None:
             height=250
         )
 
-    st.subheader("Search Document")
+    st.subheader("Ask a Question")
 
     question = st.text_input("Ask a question about the document")
 
-    if question: 
+    if question:
         with st.spinner("Searching relevant chunks..."):
             vector_store = create_vector_store(chunks)
             results = search_similar_chunks(vector_store, question)
 
-        st.write("### Most Relevant Chunks")
+        retrieved_docs = [doc for doc, score in results]
+
+        with st.spinner("Generating answer..."):
+            answer = generate_answer(question, retrieved_docs)
+
+        st.write("### Answer")
+        st.write(answer)
+
+        st.write("### Sources")
 
         for i, (doc, score) in enumerate(results, start=1):
-            st.markdown(f"**Result {i}**")
-            st.write(f"Page: {doc.metadata.get("page_number")}")
-            st.write(f"Similarity Score: {score:.4f}")
-            st.text_area(
-                f"Chunk {i}",
-                value=doc.page_content,
-                height=180
-            )
+            with st.expander(f"Source {i} — Page {doc.metadata.get('page_number')}"):
+                st.write(f"Similarity score: {score:.4f}")
+                st.write(doc.page_content)
