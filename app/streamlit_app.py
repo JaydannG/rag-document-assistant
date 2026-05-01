@@ -104,7 +104,7 @@ if uploaded_file is not None:
         st.write("### Sources")
 
         for i, (doc, score) in enumerate(results, start=1):
-            with st.expander(f"Source {i} — Page {doc.metadata.get('page_number')}"):
+            with st.expander(f"Source {i} — Page {doc.metadata.get("page_number")}, Chunk {doc.metadata.get("chunk_index")}"):
                 st.write(f"Similarity score: {score:.4f}")
                 st.write(doc.page_content)
 
